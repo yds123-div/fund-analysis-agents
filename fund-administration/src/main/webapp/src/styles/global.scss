@@ -1,0 +1,194 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page-container {
+  padding: 20px;
+}
+
+.card-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.card-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.card-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.card-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.stat-card {
+  text-align: center;
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.stat-card .stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #409eff;
+  margin: 8px 0;
+}
+
+.stat-card .stat-label {
+  font-size: 13px;
+  color: #909399;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.status-dot.online {
+  background: #67c23a;
+  box-shadow: 0 0 4px rgba(103, 194, 58, 0.4);
+}
+
+.status-dot.offline {
+  background: #f56c6c;
+}
+
+.status-dot.unknown {
+  background: #e6a23c;
+}
+
+.report-section {
+  margin-bottom: 20px;
+}
+
+.report-section h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #303133;
+  border-left: 3px solid #409eff;
+  padding-left: 10px;
+}
+
+.report-content {
+  line-height: 1.75;
+  color: #606266;
+  white-space: pre-wrap;
+  font-size: 14px;
+}
+
+/* 全局卡片样式 */
+.el-card {
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.el-card:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 进度条内文字字体统一 */
+.el-progress-bar__innerText {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 表格紧凑 + 居中 */
+.el-table {
+  font-size: 13px;
+}
+
+.el-table th {
+  background: #fafafa !important;
+  font-weight: 600;
+}
+
+.el-table th .cell, .el-table td .cell {
+  text-align: center;
+}
+
+.el-table .el-table__header th {
+  text-align: center;
+}
+
+.el-table--enable-row-hover .el-table__body tr > td {
+  text-align: center;
+}
+
+/* 描述列表紧凑 */
+.el-descriptions {
+  font-size: 13px;
+}
+
+/* 标签页 */
+.el-tabs--border-card {
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* ===== 响应式适配 ===== */
+@media (max-width: 767px) {
+  .page-container {
+    padding: 12px;
+  }
+  .card-grid-4, .card-grid-3, .card-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stat-card .stat-value {
+    font-size: 20px;
+  }
+  .stat-card .stat-label {
+    font-size: 12px;
+  }
+  .el-row {
+    flex-direction: column;
+  }
+  .el-row > .el-col {
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    margin-bottom: 12px;
+  }
+  .el-dialog {
+    width: 92% !important;
+    margin: 8vh auto !important;
+  }
+  .el-form--inline .el-form-item {
+    display: block;
+    margin-right: 0;
+    margin-bottom: 12px;
+  }
+  .el-form--inline .el-form-item .el-input {
+    width: 100% !important;
+  }
+  .el-table {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .card-grid-4, .card-grid-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+  .stat-card .stat-value {
+    font-size: 18px;
+  }
+}

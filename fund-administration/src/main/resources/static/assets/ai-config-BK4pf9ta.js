@@ -1,0 +1,1 @@
+import{r as s}from"./request-98WEjvjk.js";const i=()=>s.get("/ai/providers"),a=t=>s.post("/ai/providers",t),o=t=>s.post(`/ai/test/${t}`),n=()=>s.get("/ai/bindings"),r=t=>s.post("/ai/bindings",t),g=()=>s.get("/health");export{n as a,g as b,r as c,i as g,a as s,o as t};

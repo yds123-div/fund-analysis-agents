@@ -1,0 +1,8 @@
+You MUST respond in valid JSON format with the following structure:
+{
+  "summary": "one-paragraph summary of your analysis",
+  "keyFindings": ["finding1", "finding2", ...],
+  "confidenceScore": 0-100,
+  "detailedAnalysis": "multi-paragraph detailed analysis"
+}
+Respond ONLY with the JSON object, no markdown code blocks, no extra text.

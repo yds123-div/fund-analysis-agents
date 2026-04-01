@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="LOG_HOME" value="logs"/>
+    <property name="APP_NAME" value="fund-analysis-agents"/>
+
+    <!-- 控制台 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- app.log：全量应用日志，按日期分片 -->
+    <appender name="APP_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/app.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/archive/app.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- error.log：仅 ERROR 级别，按日期分片 -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/error.log</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/archive/error.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n%ex</pattern>
+        </encoder>
+    </appender>
+
+    <!-- llm.log：LLM 调用专用日志，按日期分片 -->
+    <appender name="LLM_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/llm.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/archive/llm.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- LLM 相关 logger：写入 llm.log + app.log -->
+    <logger name="com.hex.fund.agent.llm" level="DEBUG" additivity="true">
+        <appender-ref ref="LLM_FILE"/>
+    </logger>
+    <logger name="com.hex.fund.agent.core" level="DEBUG" additivity="true">
+        <appender-ref ref="LLM_FILE"/>
+    </logger>
+    <logger name="com.hex.fund.agent.orchestrator" level="DEBUG" additivity="true">
+        <appender-ref ref="LLM_FILE"/>
+    </logger>
+    <logger name="com.hex.fund.agent.analyst" level="DEBUG" additivity="true">
+        <appender-ref ref="LLM_FILE"/>
+    </logger>
+    <logger name="com.hex.fund.agent.debate" level="DEBUG" additivity="true">
+        <appender-ref ref="LLM_FILE"/>
+    </logger>
+    <logger name="com.hex.fund.agent.decision" level="DEBUG" additivity="true">
+        <appender-ref ref="LLM_FILE"/>
+    </logger>
+    <logger name="com.hex.fund.agent.scanner" level="DEBUG" additivity="true">
+        <appender-ref ref="LLM_FILE"/>
+    </logger>
+    <logger name="com.hex.fund.service.ai" level="DEBUG" additivity="true">
+        <appender-ref ref="LLM_FILE"/>
+    </logger>
+
+    <!-- 业务日志级别 -->
+    <logger name="com.hex.fund" level="DEBUG"/>
+    <logger name="com.baomidou.mybatisplus" level="INFO"/>
+    <logger name="org.springframework.ai" level="INFO"/>
+
+    <!-- 根 logger -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="APP_FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </root>
+</configuration>
