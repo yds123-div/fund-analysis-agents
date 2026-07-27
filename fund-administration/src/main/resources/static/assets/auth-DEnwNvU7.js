@@ -1,0 +1,1 @@
+import{r as e}from"./request-CamgJaO1.js";const o=(s,t)=>e.post("/auth/login",{username:s,password:t}),a=()=>e.get("/users"),u=s=>e.post("/users",s),c=(s,t)=>e.put(`/users/${s}`,t),n=s=>e.delete(`/users/${s}`);export{u as c,n as d,a as g,o as l,c as u};

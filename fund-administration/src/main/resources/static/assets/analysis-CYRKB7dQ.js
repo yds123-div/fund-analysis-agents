@@ -1,1 +1,0 @@
-import{r as a}from"./request-98WEjvjk.js";const o=(s,t="")=>a.post(`/analysis/${s}`,null,{params:{fundName:t}}),p=s=>a.get(`/analysis/report/${s}`),l=(s,t=1,r=20)=>a.get("/analysis/reports",{params:{fundCode:s,page:t,size:r}});export{p as g,l,o as t};

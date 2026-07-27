@@ -52,6 +52,10 @@ public class ChatModelFactory {
         if (baseUrl != null && baseUrl.contains("bigmodel.cn")) {
             apiBuilder.completionsPath("/v4/chat/completions");
         }
+        // 火山方舟 Ark：base_url 形如 https://ark.cn-beijing.volces.com/api/v3，端点为 /chat/completions
+        if (baseUrl != null && baseUrl.contains("volces.com")) {
+            apiBuilder.completionsPath("/chat/completions");
+        }
         OpenAiApi api = apiBuilder.build();
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(modelId).temperature(0.7).build();

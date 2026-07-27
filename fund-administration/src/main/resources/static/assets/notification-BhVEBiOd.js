@@ -1,1 +1,0 @@
-import{r as n}from"./request-98WEjvjk.js";const a=()=>n.get("/notification/channels"),s=t=>n.post("/notification/channels",t),e=t=>n.delete(`/notification/channels/${t}`),c=t=>n.post(`/notification/channels/${t}/test`),f=(t=1,i=20)=>n.get("/notification/history",{params:{page:t,size:i}});export{a,e as d,f as g,s,c as t};

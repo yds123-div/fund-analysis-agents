@@ -38,6 +38,8 @@ dist/
 
 ### Environment ###
 .env
+start-local.bat
+start-local.ps1
 *.log
 logs/
 
