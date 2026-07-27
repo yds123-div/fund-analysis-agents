@@ -5,12 +5,14 @@ import com.alibaba.cloud.ai.graph.KeyStrategy;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.action.AsyncNodeAction;
+import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
 import com.hex.fund.agent.graph.node.*;
 import com.hex.fund.agent.llm.LlmService;
 import com.hex.fund.agent.prompt.PromptLoader;
 import com.hex.fund.common.progress.TaskProgressHolder;
 import com.hex.fund.datasource.core.DataSourceManager;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -32,6 +34,7 @@ public class AnalysisGraphBuilder {
     private final LlmService llmService;
     private final PromptLoader promptLoader;
     private final TaskProgressHolder progressHolder;
+    private final ObservationRegistry observationRegistry;
 
     /** 构建并编译分析流程图 */
     public CompiledGraph build() {
@@ -59,13 +62,20 @@ public class AnalysisGraphBuilder {
 
     private StateGraph buildGraph(OverAllState state) throws Exception {
         return new StateGraph(state)
-                .addNode("data_collection", AsyncNodeAction.node_async(new DataCollectionNode(dataSourceManager, progressHolder)))
-                .addNode("parallel_analysis", AsyncNodeAction.node_async(new AnalystParallelNode(llmService, promptLoader, progressHolder)))
-                .addNode("debate", AsyncNodeAction.node_async(new DebateNode(llmService, promptLoader, progressHolder)))
-                .addNode("trader", AsyncNodeAction.node_async(new TraderNode(llmService, promptLoader, progressHolder)))
-                .addNode("risk_manager", AsyncNodeAction.node_async(new RiskManagerNode(llmService, promptLoader, progressHolder)))
-                .addNode("portfolio_advisor", AsyncNodeAction.node_async(new PortfolioAdvisorNode(llmService, promptLoader, progressHolder)))
-                .addNode("report_generator", AsyncNodeAction.node_async(new ReportGeneratorNode(llmService, promptLoader, progressHolder)))
+                .addNode("data_collection", AsyncNodeAction.node_async(
+                        traced("data_collection", new DataCollectionNode(dataSourceManager, progressHolder))))
+                .addNode("parallel_analysis", AsyncNodeAction.node_async(
+                        traced("parallel_analysis", new AnalystParallelNode(llmService, promptLoader, progressHolder))))
+                .addNode("debate", AsyncNodeAction.node_async(
+                        traced("debate", new DebateNode(llmService, promptLoader, progressHolder))))
+                .addNode("trader", AsyncNodeAction.node_async(
+                        traced("trader", new TraderNode(llmService, promptLoader, progressHolder))))
+                .addNode("risk_manager", AsyncNodeAction.node_async(
+                        traced("risk_manager", new RiskManagerNode(llmService, promptLoader, progressHolder))))
+                .addNode("portfolio_advisor", AsyncNodeAction.node_async(
+                        traced("portfolio_advisor", new PortfolioAdvisorNode(llmService, promptLoader, progressHolder))))
+                .addNode("report_generator", AsyncNodeAction.node_async(
+                        traced("report_generator", new ReportGeneratorNode(llmService, promptLoader, progressHolder))))
                 .addEdge(StateGraph.START, "data_collection")
                 .addEdge("data_collection", "parallel_analysis")
                 .addEdge("parallel_analysis", "debate")
@@ -74,5 +84,10 @@ public class AnalysisGraphBuilder {
                 .addEdge("risk_manager", "portfolio_advisor")
                 .addEdge("portfolio_advisor", "report_generator")
                 .addEdge("report_generator", StateGraph.END);
+    }
+
+    /** 用可追踪节点动作装饰器包裹节点，使节点执行产生一条名为 nodeName 的 observation（span）。 */
+    private NodeAction traced(String nodeName, NodeAction action) {
+        return new TracedNodeAction(nodeName, action, observationRegistry);
     }
 }

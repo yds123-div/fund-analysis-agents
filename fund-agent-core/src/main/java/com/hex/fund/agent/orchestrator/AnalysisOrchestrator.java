@@ -6,6 +6,8 @@ import com.hex.fund.agent.graph.AnalysisGraphBuilder;
 import com.hex.fund.agent.model.AgentReport;
 import com.hex.fund.agent.model.DebateRecord;
 import com.hex.fund.common.enums.ReportType;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -22,11 +24,16 @@ import java.util.UUID;
 @Component
 public class AnalysisOrchestrator {
 
+    /** 根 observation 名 - 标识一次完整基金分析（在 Opik 看板作为 trace 根 span）。 */
+    static final String ROOT_OBSERVATION_NAME = "基金分析";
+
     private final AnalysisGraphBuilder graphBuilder;
+    private final ObservationRegistry observationRegistry;
     private int debateMaxRounds = 3;
 
-    public AnalysisOrchestrator(AnalysisGraphBuilder graphBuilder) {
+    public AnalysisOrchestrator(AnalysisGraphBuilder graphBuilder, ObservationRegistry observationRegistry) {
         this.graphBuilder = graphBuilder;
+        this.observationRegistry = observationRegistry;
     }
 
     public void configure(int debateMaxRounds) {
@@ -41,7 +48,7 @@ public class AnalysisOrchestrator {
         log.info("开始图编排分析: 基金={}, 批次={}", fundCode, batchNo);
         Map<String, Object> input = buildGraphInput(fundCode, fundName, batchNo,
                 providerType, baseUrl, apiKey, modelId);
-        OverAllState finalState = executeGraph(input);
+        OverAllState finalState = executeGraphTraced(input, fundCode, fundName, batchNo, providerType, modelId);
         AnalysisResult result = extractResult(finalState, batchNo);
         log.info("图编排分析完成: 基金={}, 批次={}, Agent数={}",
                 fundCode, batchNo, result.agentReports().size());
@@ -65,6 +72,22 @@ public class AnalysisOrchestrator {
         input.put("apiKey", apiKey);
         input.put("modelId", modelId);
         return input;
+    }
+
+    /**
+     * 在根 observation 作用域内执行整条管线，使 7 个节点 span 与节点内 LLM GenAI span 作为其子 span
+     * 嵌套。根 observation 携带 fundCode/fundName/batchNo/providerType/modelId 业务属性供筛选与关联。
+     * 观测层不阻断业务：Micrometer/OTel 的 handler 异常被内部吞掉，业务异常照常抛出。
+     */
+    private OverAllState executeGraphTraced(Map<String, Object> input, String fundCode, String fundName,
+                                            String batchNo, String providerType, String modelId) {
+        return Observation.createNotStarted(ROOT_OBSERVATION_NAME, observationRegistry)
+                .lowCardinalityKeyValue("fundCode", fundCode)
+                .lowCardinalityKeyValue("providerType", providerType)
+                .lowCardinalityKeyValue("modelId", modelId)
+                .highCardinalityKeyValue("fundName", fundName)
+                .highCardinalityKeyValue("batchNo", batchNo)
+                .observe(() -> executeGraph(input));
     }
 
     private OverAllState executeGraph(Map<String, Object> input) {
