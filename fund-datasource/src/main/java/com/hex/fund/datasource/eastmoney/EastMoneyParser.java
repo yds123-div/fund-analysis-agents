@@ -33,9 +33,22 @@ public class EastMoneyParser {
     }
 
     /**
-     * Parse real-time estimate from fundgz API.
+     * Parse real-time estimate. 支持两种来源:
+     * 1) 天天基金 fundgz 的 jsonpgz 格式(jsonpgz({...});)
+     * 2) 新浪 of 行情(var hq_str_of000001="名称,单位净值,累计净值,估算净值,估算涨跌,日期";)
      */
-    public static FundEstimate parseEstimate(String jsonpResponse) {
+    public static FundEstimate parseEstimate(String response) {
+        if (response == null || response.isBlank()) return null;
+        if (response.contains("fundcode")) {
+            return parseFundgzEstimate(response);
+        }
+        if (response.contains("hq_str_of")) {
+            return parseSinaEstimate(response);
+        }
+        return null;
+    }
+
+    private static FundEstimate parseFundgzEstimate(String jsonpResponse) {
         String json = extractJsonFromJsonp(jsonpResponse);
         JSONObject obj = JSONUtil.parseObj(json);
         return FundEstimate.builder()
@@ -46,6 +59,47 @@ public class EastMoneyParser {
                 .estimateTime(parseDateTime(obj.getStr("gztime")))
                 .source("eastmoney")
                 .build();
+    }
+
+    /**
+     * 解析新浪 of 行情: var hq_str_of{code}="名称,单位净值,累计净值,估算净值,估算涨跌,日期";
+     * GBK 编码,中文不含 ASCII 逗号,可直接按逗号切分。
+     */
+    private static FundEstimate parseSinaEstimate(String response) {
+        int eq = response.indexOf('=');
+        if (eq < 0) return null;
+        int start = response.indexOf('"', eq);
+        int end = response.lastIndexOf('"');
+        if (start < 0 || end <= start) return null;
+        String[] parts = response.substring(start + 1, end).split(",");
+        if (parts.length < 6) return null;
+        String fundCode = extractSinaFundCode(response);
+        LocalDateTime estimateTime = null;
+        try {
+            // 新浪仅提供日期,无盘中时间
+            estimateTime = LocalDate.parse(parts[5].trim(), DATE_FMT).atStartOfDay();
+        } catch (Exception ignored) {
+        }
+        return FundEstimate.builder()
+                .fundCode(fundCode)
+                .fundName(parts[0])
+                .estimateNav(parseBigDecimal(parts[3]))
+                .estimateGrowthRate(parseBigDecimal(parts[4]))
+                .estimateTime(estimateTime)
+                .source("sina")
+                .build();
+    }
+
+    private static String extractSinaFundCode(String response) {
+        int idx = response.indexOf("hq_str_of");
+        if (idx < 0) return null;
+        int i = idx + "hq_str_of".length();
+        StringBuilder sb = new StringBuilder();
+        while (i < response.length() && Character.isDigit(response.charAt(i))) {
+            sb.append(response.charAt(i));
+            i++;
+        }
+        return sb.isEmpty() ? null : sb.toString();
     }
 
     /**

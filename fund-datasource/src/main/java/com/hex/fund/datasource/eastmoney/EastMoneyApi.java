@@ -1,5 +1,6 @@
 package com.hex.fund.datasource.eastmoney;
 
+import cn.hutool.core.util.CharsetUtil;
 import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONObject;
@@ -21,7 +22,11 @@ import java.util.Map;
 @Component
 public class EastMoneyApi {
 
-    private static final String ESTIMATE_URL = "http://fundgz.1234567.com.cn/js/%s.js";
+    // 实时估值接口。天天基金 fundgz 域名已被东方财富下线(返回 HTML"页面未找到"),
+    // 仅保留 https 版本作主探测,实际取数降级到新浪实时估值作为兜底。
+    private static final String ESTIMATE_URL = "https://fundgz.1234567.com.cn/js/%s.js";
+    private static final String SINA_ESTIMATE_URL = "https://hq.sinajs.cn/list=of%s";
+    private static final String SINA_REFERER = "https://finance.sina.com.cn/";
     private static final String NAV_HISTORY_URL = "https://api.fund.eastmoney.com/f10/lsjz";
     private static final String FUND_DETAIL_URL = "https://fund.eastmoney.com/pingzhongdata/%s.js";
     private static final String FUND_HOLDINGS_URL = "https://fundf10.eastmoney.com/FundArchivesDatas.aspx";
@@ -30,8 +35,37 @@ public class EastMoneyApi {
     private static final String REFERER = "https://fund.eastmoney.com/";
     private static final int TIMEOUT = 15_000;
 
+    /**
+     * 获取实时估值。优先天天基金 fundgz(数据含盘中时间),失败则降级到新浪实时估值。
+     * fundgz 域名已被东方财富下线,默认走新浪兜底。
+     */
     public String fetchEstimate(String fundCode) {
-        return HttpUtil.get(String.format(ESTIMATE_URL, fundCode), TIMEOUT);
+        String fundgz = fetchFundgzEstimate(fundCode);
+        if (fundgz != null && fundgz.contains("fundcode")) {
+            return fundgz;
+        }
+        return fetchSinaEstimate(fundCode);
+    }
+
+    private String fetchFundgzEstimate(String fundCode) {
+        try {
+            return HttpRequest.get(String.format(ESTIMATE_URL, fundCode))
+                    .header("Referer", REFERER).timeout(TIMEOUT).execute().body();
+        } catch (Exception e) {
+            log.debug("天天基金估值接口(fundgz)不可用: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String fetchSinaEstimate(String fundCode) {
+        try {
+            byte[] bytes = HttpRequest.get(String.format(SINA_ESTIMATE_URL, fundCode))
+                    .header("Referer", SINA_REFERER).timeout(TIMEOUT).execute().bodyBytes();
+            return new String(bytes, CharsetUtil.charset("GBK"));
+        } catch (Exception e) {
+            log.warn("新浪估值接口不可用: {}", e.getMessage());
+            return null;
+        }
     }
 
     public String fetchNavHistory(String fundCode, LocalDate start, LocalDate end, int pageSize) {
@@ -88,9 +122,12 @@ public class EastMoneyApi {
     }
 
     public boolean ping() {
+        // 健康检查改用净值历史接口(fundgz 估值端点下线后仍稳定可用)。
+        // 原先探测 fundgz 估值端点,但东财已下线该域名(返回 HTML"页面未找到"),
+        // 导致 isAvailable() 永远为 false,误判整个数据源离线。
         try {
-            String result = fetchEstimate("000001");
-            return result != null && result.contains("fundcode");
+            String body = fetchNavHistory("000001", LocalDate.now().minusDays(7), LocalDate.now(), 1);
+            return body != null && body.contains("\"ErrCode\":0");
         } catch (Exception e) {
             log.warn("天天基金连通性检测失败: {}", e.getMessage());
             return false;
