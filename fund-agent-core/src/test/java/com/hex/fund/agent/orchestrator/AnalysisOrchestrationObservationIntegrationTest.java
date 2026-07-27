@@ -53,9 +53,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * RGR：若不在图构建处用 {@code TracedNodeAction} 包裹各节点、或不在编排入口包根 observation，
  * 节点 span 与根 span 将不存在或父子关系断裂，本测试断言失败。
  * <p>
- * 注：并行分析师节点的虚拟线程上下文传播（6 个分析师 span 正确挂在 parallel_analysis 节点下）属 T3（#6）；
- * 当前阶段其 6 个 LLM GenAI span 因虚拟线程不继承 ThreadLocal 观测上下文而处于顶层（parent=null），故本测试
- * 仅断言 parallel_analysis 节点 span 存在，其 LLM span 嵌套由 #6 接续。
+ * 并行分析师节点（L3）的虚拟线程经上下文传播（并行节点捕获父作用域并在每个虚拟线程上重开）使 6 个分析师
+ * span 正确挂在 parallel_analysis 节点 span 下、其 LLM GenAI span 嵌套在各自分析师 span 下；本测试断言该树。
  */
 class AnalysisOrchestrationObservationIntegrationTest {
 
@@ -123,8 +122,7 @@ class AnalysisOrchestrationObservationIntegrationTest {
         List<CapturedObservation> all = handler.captured;
         assertThat(all).as("observations should have been captured").isNotEmpty();
 
-        // --- L0：根 observation「基金分析」，无父且非 GenAI ---
-        // （6 个并行分析师 GenAI span 也无父，但它们是 GenAI、属 #6 待修的孤儿 span，非根。）
+        // --- L0：根 observation「基金分析」，无父 ---
         List<CapturedObservation> roots = all.stream()
                 .filter(o -> o.parentName == null && !o.isChatModel).toList();
         assertThat(roots).as("exactly one root observation with no parent").hasSize(1);
@@ -167,15 +165,25 @@ class AnalysisOrchestrationObservationIntegrationTest {
         genAiChildrenOf("trader", all).forEach(g ->
                 assertThat(g.keyValues).containsEntry(LowCardinalityKeyNames.RESPONSE_MODEL.asString(), MODEL_ID));
 
-        // 并行分析节点 span 存在；其 LLM span 嵌套属 T3（#6），当前阶段为顶层孤儿 span。
-        assertThat(genAiChildrenOf("parallel_analysis", all))
-                .as("parallel_analysis node span exists; its analyst LLM nesting is T3 (#6)")
-                .isEmpty();
+        // --- L3：并行分析节点下挂 6 个分析师 span（虚拟线程上下文已传播），各自含 LLM GenAI span ---
+        // 虚拟线程不继承 ThreadLocal 观测上下文；并行节点捕获父（并行分析节点 span）作用域并在每个虚拟线程上重开，
+        // 使 6 个分析师 span 正确挂在 parallel_analysis 节点 span 下，其 LLM GenAI span 嵌套在各自分析师 span 下。
+        List<CapturedObservation> analystSpans = childrenOf("parallel_analysis", all);
+        assertThat(analystSpans).as("parallel_analysis node has 6 analyst child spans").hasSize(6);
+        assertThat(analystSpans.stream().map(o -> o.name).toList())
+                .as("6 analyst span names")
+                .containsExactlyInAnyOrder(
+                        "fund_analyst", "technical_analyst", "industry_analyst",
+                        "manager_analyst", "sentiment_analyst", "news_analyst");
+        analystSpans.forEach(a -> assertThat(a.parentName)
+                .as("analyst span '%s' is a child of parallel_analysis", a.name).isEqualTo("parallel_analysis"));
+        analystSpans.forEach(a -> assertThat(genAiChildrenOf(a.name, all))
+                .as("analyst span '%s' has exactly 1 nested LLM GenAI span", a.name).hasSize(1));
 
-        // 6 个并行分析师 LLM span 确实发出（虚拟线程下 parent=null），证明分析管线端到端完成。
+        // 不再有孤儿 GenAI span（虚拟线程观测上下文已正确传播，6 个分析师 LLM span 均嵌套而非顶层）。
         List<CapturedObservation> orphanedGenAi = all.stream()
                 .filter(o -> o.isChatModel && o.parentName == null).toList();
-        assertThat(orphanedGenAi).as("6 parallel analyst LLM spans emitted (orphaned until #6)").hasSize(6);
+        assertThat(orphanedGenAi).as("no orphaned GenAI spans after virtual-thread context propagation").isEmpty();
     }
 
     /** 从捕获列表里取根 observation 的 batchNo（由编排入口写入）。 */

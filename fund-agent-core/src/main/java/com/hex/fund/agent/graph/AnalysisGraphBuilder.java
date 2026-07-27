@@ -65,7 +65,7 @@ public class AnalysisGraphBuilder {
                 .addNode("data_collection", AsyncNodeAction.node_async(
                         traced("data_collection", new DataCollectionNode(dataSourceManager, progressHolder))))
                 .addNode("parallel_analysis", AsyncNodeAction.node_async(
-                        traced("parallel_analysis", new AnalystParallelNode(llmService, promptLoader, progressHolder))))
+                        traced("parallel_analysis", new AnalystParallelNode(llmService, promptLoader, progressHolder, observationRegistry))))
                 .addNode("debate", AsyncNodeAction.node_async(
                         traced("debate", new DebateNode(llmService, promptLoader, progressHolder))))
                 .addNode("trader", AsyncNodeAction.node_async(
