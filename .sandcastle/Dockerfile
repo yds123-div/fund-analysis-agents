@@ -38,13 +38,13 @@ ARG AGENT_GID=1000
 
 # Rename the base image's "node" user to "agent" and align UID/GID.
 RUN groupmod -o -g $AGENT_GID node && usermod -o -u $AGENT_UID -g $AGENT_GID -d /home/agent -m -l agent node
+
+# Install Claude Code CLI as root so the binary lands on the system PATH
+# (/usr/local/bin, already on PATH for all users). The upstream
+# claude.ai/install.sh silently produced no binary in this image.
+RUN npm install -g @anthropic-ai/claude-code
+
 USER ${AGENT_UID}:${AGENT_GID}
-
-# Install Claude Code CLI
-RUN curl -fsSL https://claude.ai/install.sh | bash
-
-# Add Claude to PATH
-ENV PATH="/home/agent/.local/bin:$PATH"
 
 WORKDIR /home/agent
 

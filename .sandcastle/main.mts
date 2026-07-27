@@ -37,17 +37,19 @@ await run({
   // per run, or set it to 1 for a single-shot mode.
   maxIterations: 3,
 
-  // Branch strategy — merge-to-head creates a temporary branch for the agent
-  // to work on, then merges the result back to HEAD when the run completes.
-  // This is required when using copyToWorktree, since head mode bind-mounts
-  // the host directory directly (no worktree to copy into).
-  branchStrategy: { type: "merge-to-head" },
-
-  // Copy node_modules from the host into the worktree before the sandbox
-  // starts. This avoids a full npm install from scratch on every iteration.
-  // The onSandboxReady hook still runs npm install as a safety net to handle
-  // platform-specific binaries and any packages added since the last copy.
-  copyToWorktree: ["node_modules"],
+  // Branch strategy — head mode bind-mounts this worktree directly into the
+  // sandbox; the agent commits onto the current branch (worktree-sandcastle-
+  // setup). Required on Windows: merge-to-head + copyToWorktree takes the
+  // non-head path, where sandcastle 0.12.0's Windows .git-mount patch
+  // (patchGitMountsForWindows, ADR-0006) fails to match — it compares the
+  // mount's hostRepoDir/.git against worktreeInfo.path/.git — so the .git
+  // mount is left as `-v D:/x/.git:D:/x/.git:z`, whose drive-letter colon
+  // Docker Desktop rejects as "too many colons". Head mode makes hostRepoDir
+  // == worktreeHostPath so the patch matches and remaps the .git mount's
+  // destination to a Linux path. node_modules is already visible via the
+  // direct bind-mount, so copyToWorktree is dropped (onSandboxReady still
+  // runs `npm install` as a safety net).
+  branchStrategy: { type: "head" },
 
   // Lifecycle hooks — commands grouped by where they run (host or sandbox).
   hooks: {
@@ -55,6 +57,13 @@ await run({
       // onSandboxReady runs once after the sandbox is initialised and the repo is
       // synced in, before the agent starts. Use it to install dependencies or run
       // any other setup steps your project needs.
+      // sandcastle sets safe.directory for the repo dir before these hooks run,
+      // so git works despite the bind-mount's host ownership. gh repo set-default
+      // was tried here but it calls the GitHub GraphQL API to resolve the repo's
+      // node ID, and that call hit transient `Post .../graphql: EOF` resets from
+      // this network - and onSandboxReady failures abort the whole run. Instead,
+      // prompt.md passes `--repo yds123-div/fund-analysis-agents` to every gh
+      // command, which needs no resolution call.
       onSandboxReady: [{ command: "npm install" }],
     },
   },
