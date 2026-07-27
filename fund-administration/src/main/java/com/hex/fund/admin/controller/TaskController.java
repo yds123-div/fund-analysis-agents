@@ -52,12 +52,15 @@ public class TaskController {
     @Operation(summary = "SSE 进度推送流")
     @GetMapping(value = "/progress-stream/{batchNo}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamProgress(@PathVariable String batchNo) {
-        SseEmitter emitter = new SseEmitter(300_000L);
+        // 超时需大于分析最长执行时间（默认 30 分钟），留 5 分钟余量，避免长任务中途被 SSE 提前断开
+        SseEmitter emitter = new SseEmitter(35 * 60 * 1000L);
         emitters.put(batchNo, emitter);
 
         new Thread(() -> {
             try {
-                int lastProgress = -1;
+                // 哨兵初值不能是 -1：失败进度正是 -1，若 SSE 建连时分析已失败，
+                // 初值与终态相同会导致首条失败事件永不发出、循环空转直到超时，前端只能看到"连接中断"
+                int lastProgress = Integer.MIN_VALUE;
                 while (true) {
                     var progress = progressHolder.get(batchNo);
                     if (progress.isPresent()) {

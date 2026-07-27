@@ -15,6 +15,8 @@ import com.hex.fund.service.mapper.TaskExecutionMapper;
 import com.hex.fund.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -43,6 +45,15 @@ public class AnalysisService {
     private final NotificationService notificationService;
     private final TaskProgressHolder progressHolder;
 
+    /**
+     * 自注入代理引用，使 {@link #executeAsync} 上的 {@code @Async} 生效。
+     * 直接以 {@code this.executeAsync(...)} 自调用会绕过 Spring 代理，导致方法在调用线程同步执行
+     * （历史 bug：分析在 HTTP 触发请求线程里同步跑完，前端 SSE 还没建连进度就已是终态，进而触发"连接中断"）。
+     */
+    @Autowired
+    @Lazy
+    private AnalysisService self;
+
     /** 触发分析：创建执行记录，异步执行，立即返回 batchNo */
     public String triggerAnalysis(String fundCode, String fundName) {
         return triggerAnalysis(fundCode, fundName, "MANUAL");
@@ -59,7 +70,8 @@ public class AnalysisService {
         TaskExecution execution = createExecution(fundCode, fundName, batchNo, triggerType);
         executionMapper.insert(execution);
         progressHolder.update(batchNo, 0, "等待执行");
-        executeAsync(execution.getId(), fundCode, fundName, batchNo, timeoutMinutes);
+        // 通过代理调用，确保 @Async 生效，分析在独立线程异步执行，HTTP 请求立即返回 batchNo
+        self.executeAsync(execution.getId(), fundCode, fundName, batchNo, timeoutMinutes);
         return batchNo;
     }
 

@@ -3,6 +3,7 @@ package com.hex.fund.app;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -11,6 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication(scanBasePackages = "com.hex.fund")
 @MapperScan("com.hex.fund.service.mapper")
 @EnableScheduling
+@EnableAsync
 public class FundAnalysisApplication {
 
     public static void main(String[] args) {

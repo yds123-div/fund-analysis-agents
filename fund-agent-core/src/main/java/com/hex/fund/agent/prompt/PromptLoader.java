@@ -19,6 +19,15 @@ public class PromptLoader {
     private static final String BASE_PATH = "prompts/";
     private final Cache<String, String> cache = Caffeine.newBuilder().maximumSize(50).build();
 
+    /**
+     * 显式使用加载本类的 ClassLoader（fat JAR 下为 Spring Boot 的 LaunchedURLClassLoader）来定位资源。
+     * 图编排会在虚拟线程 / ForkJoinPool 上执行各 Agent，这些非 Spring 线程的 ContextClassLoader
+     * 通常不是 LaunchedURLClassLoader，导致 {@code new ClassPathResource(path)} 读不到嵌套 jar
+     * 内的 prompts/*.txt（历史 bug：所有 Agent 均报 "Prompt not found"）。显式指定 ClassLoader 后，
+     * 无论在哪个线程调用都能正确解析嵌套 jar 资源。
+     */
+    private final ClassLoader classLoader = PromptLoader.class.getClassLoader();
+
     /** 按路径加载提示词模板（如 "analyst/fund-analyst-system"） */
     public String load(String path) {
         return cache.get(path, this::readResource);
@@ -32,7 +41,7 @@ public class PromptLoader {
 
     private String readResource(String path) {
         try {
-            var resource = new ClassPathResource(BASE_PATH + path + ".txt");
+            var resource = new ClassPathResource(BASE_PATH + path + ".txt", classLoader);
             String content = resource.getContentAsString(StandardCharsets.UTF_8);
             log.debug("提示词模板已加载: {}", path);
             return content;
