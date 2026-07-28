@@ -11,6 +11,8 @@ import com.hex.fund.agent.prompt.PromptLoader;
 import com.hex.fund.common.enums.AnalysisPhase;
 import com.hex.fund.common.enums.ReportType;
 import com.hex.fund.common.progress.TaskProgressHolder;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -31,6 +33,7 @@ public class AnalystParallelNode implements NodeAction {
     private final LlmService llmService;
     private final PromptLoader promptLoader;
     private final TaskProgressHolder progressHolder;
+    private final ObservationRegistry observationRegistry;
 
     @Override
     @SuppressWarnings("unchecked")
@@ -67,16 +70,36 @@ public class AnalystParallelNode implements NodeAction {
                 new ManagerAnalystAgent(), new SentimentAnalystAgent(), new NewsAnalystAgent());
         Map<String, AgentReport> reports = new ConcurrentHashMap<>();
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            // 捕获并行分析节点 span 的观测上下文（本节点 apply 正运行于其作用域内），跨虚拟线程传播，
+            // 使 6 个分析师 span 正确挂在并行分析节点 span 下，而非因虚拟线程不继承 ThreadLocal 而丢失/挂错。
+            // SimpleObservation 的 lastScope 为 ConcurrentHashMap、当前作用域走 ThreadLocal，故并发 openScope 安全。
+            Observation parentObservation = observationRegistry.getCurrentObservation();
             Map<String, Future<AgentReport>> futures = new HashMap<>();
             for (AbstractAnalysisAgent agent : agents) {
-                futures.put(agent.getAgentId(), executor.submit(() -> {
-                    agent.configure(llmService, promptLoader, providerType, baseUrl, apiKey, modelId);
-                    return agent.analyze(context);
-                }));
+                futures.put(agent.getAgentId(), executor.submit(() ->
+                        runAnalystTraced(parentObservation, agent, context,
+                                providerType, baseUrl, apiKey, modelId)));
             }
             collectResults(futures, reports);
         }
         return reports;
+    }
+
+    /**
+     * 在虚拟线程上重开父（并行分析节点）观测作用域，并把单个分析师执行包成一条以分析师 id 命名的 observation
+     * （作为并行分析节点 span 的子 span）。分析师内的 LLM 调用经 Spring AI 自动产生的 GenAI span 会嵌套在
+     * 该分析师 span 下。不改变并发语义与超时（仍虚拟线程、collectResults 仍 120s/任务）。
+     */
+    private AgentReport runAnalystTraced(Observation parentObservation, AbstractAnalysisAgent agent,
+                                         AnalysisContext context, String providerType,
+                                         String baseUrl, String apiKey, String modelId) {
+        try (Observation.Scope scope = parentObservation == null ? null : parentObservation.openScope()) {
+            return Observation.createNotStarted(agent.getAgentId(), observationRegistry)
+                    .observe(() -> {
+                        agent.configure(llmService, promptLoader, providerType, baseUrl, apiKey, modelId);
+                        return agent.analyze(context);
+                    });
+        }
     }
 
     private void collectResults(Map<String, Future<AgentReport>> futures,
