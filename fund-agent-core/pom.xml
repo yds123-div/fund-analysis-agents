@@ -36,5 +36,22 @@
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
         </dependency>
+        <!-- Opik 端到端冒烟测试（test scope）：OTel 桥把 Micrometer observation 转 span，OTLP HTTP 导出器推至自托管 Opik。
+             版本全部由 spring-boot-dependencies BOM 托管。默认不进快循环（@EnabledIfEnvironmentVariable 门控）。 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
